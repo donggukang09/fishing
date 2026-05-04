@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="낚시컴패니언">
+<meta name="theme-color" content="#0a1628">
+<meta name="description" content="바다낚시 조과 기록, 날씨/파도 정보, 낚시 포인트 관리">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>바다낚시 컴패니언</title>
+<style>
+  :root {
+    --bg-deep: #0a1628;
+    --bg-card: #111d33;
+    --bg-card-hover: #162744;
+    --accent-cyan: #00d4ff;
+    --accent-teal: #00b8a9;
+    --accent-orange: #ff6b35;
+    --accent-gold: #ffc107;
+    --accent-red: #ff4757;
+    --text-primary: #e8edf5;
+    --text-secondary: #7a8ba8;
+    --text-muted: #4a5d7a;
+    --border: #1e3050;
+    --glass: rgba(17, 29, 51, 0.85);
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: contain;
+  }
+
+  /* ── Ocean background ── */
+  .ocean-bg {
+    position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  }
+  .ocean-bg::before {
+    content: '';
+    position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(0,212,255,0.07) 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 80%, rgba(0,184,169,0.05) 0%, transparent 50%);
+    animation: drift 25s ease-in-out infinite;
+  }
+  @keyframes drift {
+    0%,100% { transform: translate(0,0); }
+    50% { transform: translate(-1.5%,1%); }
+  }
+
+  .wave-deco {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 100px;
+    z-index: 0; pointer-events: none; opacity: 0.12;
+  }
+
+  .app-wrap {
+    position: relative; z-index: 1;
+    max-width: 500px; margin: 0 auto;
+    min-height: 100vh; min-height: 100dvh;
+    padding-bottom: calc(72px + var(--safe-bottom));
+  }
+
+  /* ── Header ── */
+  .header {
+    padding: 16px 20px 12px;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-teal));
+    border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px;
+    box-shadow: 0 3px 14px rgba(0,212,255,0.25);
+  }
+  .logo-text { font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent-cyan), #e8edf5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .logo-sub { font-size: 10px; color: var(--text-muted); font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
+  .header-right { text-align: right; }
+  .header-date { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+  .header-day { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+
+  /* ── Install Banner ── */
+  .install-banner {
+    margin: 0 20px 12px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(255,107,53,0.12), rgba(255,193,7,0.08));
+    border: 1px solid rgba(255,107,53,0.25);
+    border-radius: var(--radius-sm);
+    display: none; align-items: center; gap: 12px;
+    animation: fadeSlide 0.4s ease;
+  }
+  .install-banner.show { display: flex; }
+  .install-banner-text { flex: 1; font-size: 13px; color: var(--text-primary); font-weight: 600; }
+  .install-banner-text span { display: block; font-size: 11px; color: var(--text-secondary); font-weight: 400; margin-top: 2px; }
+  .install-btn {
+    padding: 7px 16px; border: none; border-radius: 8px;
+    background: var(--accent-orange); color: #fff;
+    font-family: inherit; font-size: 12px; font-weight: 700;
+    cursor: pointer; white-space: nowrap;
+  }
+  .install-close {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 18px; cursor: pointer; padding: 4px;
+  }
+  @keyframes fadeSlide { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ── Bottom Nav ── */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 500px;
+    background: rgba(10,22,40,0.96);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding: 6px 0 calc(6px + var(--safe-bottom));
+    z-index: 100;
+  }
+  .nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 4px; border: none; background: none;
+    color: var(--text-muted); font-family: inherit; font-size: 10px; font-weight: 600;
+    cursor: pointer; transition: color 0.2s; position: relative;
+  }
+  .nav-btn.active { color: var(--accent-cyan); }
+  .nav-btn.active::before {
+    content: ''; position: absolute; top: -6px;
+    width: 20px; height: 2.5px; background: var(--accent-cyan); border-radius: 0 0 3px 3px;
+  }
+  .nav-btn .ico { font-size: 20px; }
+
+  /* ── FAB ── */
+  .fab {
+    position: fixed; z-index: 101;
+    bottom: calc(72px + var(--safe-bottom));
+    right: calc(50% - 220px);
+    width: 50px; height: 50px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-orange), #ff8c5a);
+    border: none; color: #fff; font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(255,107,53,0.4);
+    transition: transform 0.2s;
+  }
+  .fab:active { transform: scale(0.92); }
+  @media (max-width:500px) { .fab { right: 18px; } }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; margin: 0 20px 14px;
+    transition: border-color 0.3s;
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .card-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+  .badge-live {
+    font-size: 10px; padding: 2px 9px; border-radius: 20px; font-weight: 700;
+    background: rgba(255,107,53,0.14); color: var(--accent-orange);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  /* ── Weather ── */
+  .wx-main { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .wx-icon { font-size: 44px; line-height: 1; }
+  .wx-temp { font-size: 40px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+  .wx-desc { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+  .wx-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+  .wx-item {
+    text-align: center; padding: 10px 2px;
+    background: rgba(255,255,255,0.025); border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+  .wx-item .ico { font-size: 16px; margin-bottom: 3px; }
+  .wx-item .val { font-size: 14px; font-weight: 700; }
+  .wx-item .lbl { font-size: 9px; color: var(--text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  /* ── Wave / Tide ── */
+  .wave-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px; }
+  .w-stat {
+    text-align: center; padding: 12px 6px;
+    background: rgba(0,212,255,0.04); border-radius: 10px;
+    border: 1px solid rgba(0,212,255,0.08);
+  }
+  .w-stat .num { font-size: 20px; font-weight: 800; color: var(--accent-cyan); }
+  .w-stat .unit { font-size: 11px; color: var(--text-muted); }
+  .w-stat .lbl { font-size: 10px; color: var(--text-secondary); margin-top: 3px; }
+
+  .tide-wrap { margin-top: 18px; }
+  .tide-title { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; }
+  .tide-bars { display: flex; align-items: flex-end; gap: 2px; height: 50px; }
+  .tide-bar {
+    flex: 1; border-radius: 2px 2px 0 0; min-height: 5px;
+    background: linear-gradient(to top, var(--accent-cyan), var(--accent-teal));
+    opacity: 0.45; transition: opacity 0.2s;
+  }
+  .tide-bar.now { opacity: 1; box-shadow: 0 0 10px rgba(0,212,255,0.35); }
+  .tide-labels { display: flex; justify-content: space-between; font-size: 9px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ── Fishing Score ── */
+  .fish-score {
+    display: flex; align-items: center; gap: 14px;
+    margin-top: 16px; padding: 14px;
+    background: linear-gradient(135deg, rgba(0,184,169,0.08), rgba(0,212,255,0.04));
+    border-radius: 12px; border: 1px solid rgba(0,184,169,0.18);
+  }
+  .score-ring {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 800; flex-shrink: 0;
+  }
+  .score-good { background: rgba(0,184,169,0.15); color: var(--accent-teal); box-shadow: 0 0 16px rgba(0,184,169,0.15); }
+  .score-mid  { background: rgba(255,193,7,0.15); color: var(--accent-gold); }
+  .score-low  { background: rgba(255,71,87,0.15); color: var(--accent-red); }
+  .score-txt h4 { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+  .score-txt p  { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+
+  /* ── Catch Log ── */
+  .catch-item {
+    display: flex; gap: 12px; padding: 14px;
+    background: rgba(255,255,255,0.015); border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.03);
+    margin-bottom: 8px; transition: all 0.2s;
+  }
+  .catch-item:active { background: rgba(0,212,255,0.03); }
+  .catch-thumb {
+    width: 58px; height: 58px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--bg-deep), var(--bg-card));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0; border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .catch-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .catch-body { flex: 1; min-width: 0; }
+  .catch-name { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+  .catch-meta { font-size: 11px; color: var(--text-secondary); display: flex; gap: 10px; flex-wrap: wrap; }
+  .catch-meta span { display: flex; align-items: center; gap: 3px; }
+  .catch-size { font-size: 12px; font-weight: 700; color: var(--accent-teal); margin-top: 5px; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 14px; }
+  .stat-box {
+    padding: 14px; text-align: center;
+    background: rgba(255,255,255,0.025); border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .stat-num {
+    font-size: 26px; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-teal));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .stat-lbl { font-size: 10px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ── Points / Map ── */
+  .map-box {
+    width: 100%; height: 260px; border-radius: 12px;
+    background: linear-gradient(135deg, #0d1f3c, #0a1628);
+    border: 1px solid var(--border);
+    position: relative; overflow: hidden; margin-bottom: 14px;
+  }
+  .map-box::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(0,212,255,0.06) 0%, transparent 40%),
+      radial-gradient(circle at 70% 60%, rgba(0,184,169,0.05) 0%, transparent 40%);
+  }
+  .map-pin {
+    position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    cursor: pointer; transition: transform 0.2s;
+  }
+  .map-pin:active { transform: scale(1.2); }
+  .pin-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    box-shadow: 0 0 10px currentColor;
+  }
+  .pin-dot.orange { background: var(--accent-orange); color: rgba(255,107,53,0.5); }
+  .pin-dot.teal   { background: var(--accent-teal); color: rgba(0,184,169,0.5); }
+  .pin-dot.gold   { background: var(--accent-gold); color: rgba(255,193,7,0.5); }
+  .pin-label {
+    font-size: 8px; color: var(--text-primary);
+    background: rgba(0,0,0,0.55); padding: 2px 5px; border-radius: 3px;
+    white-space: nowrap; font-weight: 600;
+  }
+  .map-note {
+    position: absolute; bottom: 12px; left: 0; right: 0; text-align: center;
+    font-size: 11px; color: var(--text-muted);
+  }
+
+  .point-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px; background: rgba(255,255,255,0.015);
+    border-radius: 10px; border: 1px solid rgba(255,255,255,0.03);
+    margin-bottom: 7px;
+  }
+  .point-item:active { background: rgba(0,212,255,0.03); }
+  .pt-rank {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+    background: rgba(255,107,53,0.12); color: var(--accent-orange);
+  }
+  .pt-name { font-size: 13px; font-weight: 600; }
+  .pt-sub  { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+  .pt-tags { margin-left: auto; display: flex; gap: 3px; flex-shrink: 0; }
+  .pt-tag {
+    font-size: 9px; padding: 2px 7px; border-radius: 10px;
+    background: rgba(0,212,255,0.08); color: var(--accent-cyan); font-weight: 600;
+  }
+
+  /* ── Settings ── */
+  .form-group { margin-bottom: 12px; }
+  .form-lbl {
+    display: block; font-size: 11px; font-weight: 600;
+    color: var(--text-secondary); margin-bottom: 5px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .form-input {
+    width: 100%; padding: 11px 14px;
+    background: rgba(255,255,255,0.035); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text-primary);
+    font-family: inherit; font-size: 14px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent-cyan); }
+  .form-input::placeholder { color: var(--text-muted); }
+  select.form-input {
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L0 2h10z' fill='%237a8ba8'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+  }
+  textarea.form-input { resize: vertical; min-height: 72px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    width: 100%; padding: 13px 20px; border: none; border-radius: 10px;
+    font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-teal));
+    color: var(--bg-deep);
+    box-shadow: 0 3px 14px rgba(0,212,255,0.25);
+  }
+  .btn-ghost {
+    background: rgba(255,255,255,0.05); color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Modal ── */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 200;
+    display: flex; align-items: flex-end; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+  }
+  .modal-bg.open { opacity: 1; pointer-events: all; }
+  .modal-sheet {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 22px 22px 0 0;
+    width: 100%; max-width: 500px; max-height: 88vh; max-height: 88dvh;
+    overflow-y: auto; padding: 20px 20px 36px;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.16,1,0.3,1);
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-bg.open .modal-sheet { transform: translateY(0); }
+  .modal-handle { width: 32px; height: 4px; background: var(--text-muted); border-radius: 2px; margin: 0 auto 16px; }
+  .modal-title { font-size: 17px; font-weight: 800; text-align: center; margin-bottom: 18px; }
+
+  .photo-upload {
+    width: 100%; height: 120px;
+    border: 2px dashed var(--border); border-radius: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    cursor: pointer; transition: all 0.2s; margin-bottom: 12px;
+    color: var(--text-muted); font-size: 12px; overflow: hidden; position: relative;
+  }
+  .photo-upload:active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .photo-upload .preview {
+    position: absolute; inset: 0; object-fit: cover; width: 100%; height: 100%;
+  }
+  .photo-upload .ico { font-size: 28px; }
+
+  .species-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+  .sp-chip {
+    padding: 5px 12px; border-radius: 18px;
+    background: rgba(255,255,255,0.035); border: 1px solid var(--border);
+    color: var(--text-secondary); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+    -webkit-user-select: none; user-select: none;
+  }
+  .sp-chip:active, .sp-chip.on {
+    background: rgba(0,212,255,0.1); border-color: var(--accent-cyan); color: var(--accent-cyan);
+  }
+
+  /* ── Section Titles ── */
+  .sec-title {
+    font-size: 12px; font-weight: 700; color: var(--text-secondary);
+    padding: 0 20px; margin-bottom: 10px;
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+
+  /* ── Pages ── */
+  .page { display: none; animation: pgIn 0.25s ease; }
+  .page.on { display: block; }
+  @keyframes pgIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; top: calc(16px + env(safe-area-inset-top, 0px));
+    left: 50%; transform: translateX(-50%) translateY(-80px);
+    background: var(--accent-teal); color: var(--bg-deep);
+    padding: 10px 22px; border-radius: 12px;
+    font-weight: 700; font-size: 13px; z-index: 300;
+    transition: transform 0.35s cubic-bezier(0.16,1,0.3,1);
+    box-shadow: 0 4px 18px rgba(0,184,169,0.35);
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 36px 20px; color: var(--text-muted); }
+  .empty .ico { font-size: 40px; margin-bottom: 10px; }
+  .empty p { font-size: 13px; line-height: 1.6; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Location select ── */
+  .location-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; margin-bottom: 14px;
+  }
+  .location-select {
+    padding: 6px 12px; border-radius: 8px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    color: var(--text-primary); font-family: inherit; font-size: 12px; font-weight: 600;
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath d='M4 6L0 1h8z' fill='%237a8ba8'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px;
+  }
+</style>
+</head>
+<body>
+
+<div class="ocean-bg"></div>
+<svg class="wave-deco" viewBox="0 0 1440 100" preserveAspectRatio="none">
+  <path d="M0,50 C240,90 480,10 720,50 C960,90 1200,10 1440,50 L1440,100 L0,100Z" fill="rgba(0,212,255,0.07)"/>
+  <path d="M0,70 C240,30 480,90 720,70 C960,30 1200,90 1440,70 L1440,100 L0,100Z" fill="rgba(0,184,169,0.04)"/>
+</svg>
+
+<div class="app-wrap">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">🎣</div>
+      <div>
+        <div class="logo-text">바다낚시 컴패니언</div>
+        <div class="logo-sub">Fishing Companion</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-date" id="hDate"></div>
+      <div class="header-day" id="hDay"></div>
+    </div>
+  </header>
+
+  <!-- Install Banner -->
+  <div class="install-banner" id="installBanner">
+    <div class="install-banner-text">
+      📲 홈 화면에 설치하기
+      <span>앱처럼 바로 실행할 수 있어요</span>
+    </div>
+    <button class="install-btn" id="installBtn">설치</button>
+    <button class="install-close" id="installClose">&times;</button>
+  </div>
+
+  <!-- ═══ PAGE: HOME ═══ -->
+  <div class="page on" id="pg-home">
+
+    <div class="location-header">
+      <span style="font-size:12px; color:var(--text-muted); font-weight:600;">📍 기준 지역</span>
+      <select class="location-select" id="regionSelect">
+        <option value="incheon">인천 / 서해</option>
+        <option value="busan">부산 / 남해</option>
+        <option value="gangneung">강릉 / 동해</option>
+        <option value="jeju">제주</option>
+      </select>
+    </div>
+
+    <!-- Weather -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">🌤️ 현재 날씨</div>
+        <span class="badge-live">LIVE</span>
+      </div>
+      <div class="wx-main">
+        <div class="wx-icon" id="wxIcon">⛅</div>
+        <div>
+          <div class="wx-temp" id="wxTemp">18°</div>
+          <div class="wx-desc" id="wxDesc">구름 조금 · 체감 16°</div>
+        </div>
+      </div>
+      <div class="wx-grid">
+        <div class="wx-item"><div class="ico">💨</div><div class="val" id="wWind">3.2</div><div class="lbl">풍속 m/s</div></div>
+        <div class="wx-item"><div class="ico">🧭</div><div class="val" id="wDir">북서</div><div class="lbl">풍향</div></div>
+        <div class="wx-item"><div class="ico">💧</div><div class="val" id="wHum">65%</div><div class="lbl">습도</div></div>
+        <div class="wx-item"><div class="ico">🌡️</div><div class="val" id="wSea">16°</div><div class="lbl">수온</div></div>
+      </div>
+    </div>
+
+    <!-- Wave / Tide -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">🌊 파도 · 조류</div>
+        <span class="badge-live">LIVE</span>
+      </div>
+      <div class="wave-stats">
+        <div class="w-stat"><div class="num">0.8<span class="unit">m</span></div><div class="lbl">파고</div></div>
+        <div class="w-stat"><div class="num">6.2<span class="unit">s</span></div><div class="lbl">주기</div></div>
+        <div class="w-stat"><div class="num">남서</div><div class="lbl">파향</div></div>
+      </div>
+      <div class="tide-wrap">
+        <div class="tide-title">📊 조위 그래프 (오늘)</div>
+        <div class="tide-bars" id="tideBars"></div>
+        <div class="tide-labels"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+      </div>
+      <div class="fish-score" id="fishScore">
+        <div class="score-ring score-good" id="scoreRing">82</div>
+        <div class="score-txt">
+          <h4>🐟 낚시 적합도: <span id="scoreLbl">좋음</span></h4>
+          <p id="scoreDesc">파도 낮고 풍속 적당. 조류 흐름 원활하여 바다낚시 하기 좋은 조건입니다.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ PAGE: LOG ═══ -->
+  <div class="page" id="pg-log">
+    <div class="sec-title">📊 이번 달 통계</div>
+    <div style="padding:0 20px;">
+      <div class="stats-row" id="statsRow">
+        <div class="stat-box"><div class="stat-num" id="sCnt">0</div><div class="stat-lbl">총 출조</div></div>
+        <div class="stat-box"><div class="stat-num" id="sFish">0</div><div class="stat-lbl">총 마리수</div></div>
+        <div class="stat-box"><div class="stat-num" id="sMax">-</div><div class="stat-lbl">최대 사이즈</div></div>
+        <div class="stat-box"><div class="stat-num" id="sTop">-</div><div class="stat-lbl">최다 어종</div></div>
+      </div>
+    </div>
+
+    <div class="sec-title">📋 조과 기록</div>
+    <div style="padding:0 20px;" id="catchList">
+      <div class="empty" id="emptyLog">
+        <div class="ico">🐟</div>
+        <p>아직 기록이 없습니다<br>+ 버튼으로 첫 조과를 기록해보세요!</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PAGE: MAP ═══ -->
+  <div class="page" id="pg-map">
+    <div class="sec-title">📍 나의 낚시 포인트</div>
+    <div style="padding:0 20px;">
+      <div class="map-box" id="mapBox">
+        <div class="map-pin" style="top:22%;left:20%;"><div class="pin-dot orange"></div><div class="pin-label">인천 방파제</div></div>
+        <div class="map-pin" style="top:42%;left:32%;"><div class="pin-dot teal"></div><div class="pin-label">태안 갯바위</div></div>
+        <div class="map-pin" style="top:58%;left:52%;"><div class="pin-dot orange"></div><div class="pin-label">안면도</div></div>
+        <div class="map-pin" style="top:32%;left:72%;"><div class="pin-dot gold"></div><div class="pin-label">제주 서귀포</div></div>
+        <div class="map-note">🗺️ 카카오맵 연동 시 실제 위치 표시</div>
+      </div>
+    </div>
+
+    <div class="sec-title">⭐ 즐겨찾기 포인트</div>
+    <div style="padding:0 20px;" id="pointList">
+      <div class="empty" id="emptyPt">
+        <div class="ico">📍</div>
+        <p>저장된 포인트가 없습니다<br>조과 기록 시 장소가 자동 저장됩니다</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PAGE: SETTINGS ═══ -->
+  <div class="page" id="pg-set">
+    <div class="sec-title">⚙️ 설정</div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px;">📊 Google Sheets 연동</div>
+      <div class="form-group">
+        <label class="form-lbl">스프레드시트 ID</label>
+        <input type="text" class="form-input" placeholder="Google Sheets ID 입력" id="cfgSheet">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Apps Script 웹앱 URL</label>
+        <input type="url" class="form-input" placeholder="https://script.google.com/..." id="cfgScript">
+      </div>
+      <button class="btn btn-primary" onclick="saveConfig()">💾 연동 설정 저장</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px;">🌊 날씨 API</div>
+      <div class="form-group">
+        <label class="form-lbl">기상청 API 키 (선택)</label>
+        <input type="text" class="form-input" placeholder="공공데이터포털 인증키" id="cfgApiKey">
+      </div>
+      <p style="font-size:11px; color:var(--text-muted); line-height:1.6; margin-top:6px;">
+        * 기상청 단기예보 API를 연동하면 실시간 날씨를 표시합니다.<br>
+        * <a href="https://data.go.kr" target="_blank" rel="noopener" style="color:var(--accent-cyan);">data.go.kr</a>에서 무료 발급 가능
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px;">📤 데이터 관리</div>
+      <button class="btn btn-ghost" onclick="exportData()" style="margin-bottom:8px;">📥 데이터 백업 (JSON)</button>
+      <label class="btn btn-ghost" style="cursor:pointer;">
+        📤 데이터 복원
+        <input type="file" accept=".json" style="display:none;" onchange="importData(event)">
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px;">ℹ️ 앱 정보</div>
+      <p style="font-size:12px; color:var(--text-secondary); line-height:1.8;">
+        바다낚시 컴패니언 v1.0<br>
+        조과 기록 · 날씨/파도 · 낚시 포인트 관리<br>
+        <span style="color:var(--text-muted); font-size:10px;">DEVELOPED BY DONGGU KANG</span>
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fab" onclick="openModal()">+</button>
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-pg="home"><span class="ico">🌤️</span>날씨·파도</button>
+  <button class="nav-btn" data-pg="log"><span class="ico">📋</span>조과기록</button>
+  <button class="nav-btn" data-pg="map"><span class="ico">📍</span>포인트</button>
+  <button class="nav-btn" data-pg="set"><span class="ico">⚙️</span>설정</button>
+</nav>
+
+<!-- ═══ ADD CATCH MODAL ═══ -->
+<div class="modal-bg" id="modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🐟 조과 기록 추가</div>
+
+    <div class="photo-upload" id="photoArea" onclick="document.getElementById('photoIn').click()">
+      <span class="ico" id="photoIco">📷</span>
+      <span id="photoLbl">사진 촬영 또는 선택</span>
+      <input type="file" id="photoIn" accept="image/*" capture="environment" style="display:none">
+    </div>
+
+    <div class="form-group">
+      <label class="form-lbl">어종</label>
+      <div class="species-chips" id="spChips">
+        <div class="sp-chip">감성돔</div><div class="sp-chip">볼락</div><div class="sp-chip">우럭</div>
+        <div class="sp-chip">농어</div><div class="sp-chip">주꾸미</div><div class="sp-chip">광어</div>
+        <div class="sp-chip">참돔</div><div class="sp-chip">벵에돔</div><div class="sp-chip">학꽁치</div>
+        <div class="sp-chip">고등어</div>
+      </div>
+      <input type="text" class="form-input" placeholder="직접 입력 또는 위에서 선택" id="fSpecies">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group"><label class="form-lbl">크기 (cm)</label><input type="number" class="form-input" placeholder="35" id="fSize"></div>
+      <div class="form-group"><label class="form-lbl">무게 (g)</label><input type="number" class="form-input" placeholder="800" id="fWeight"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-lbl">낚시 장소</label>
+      <input type="text" class="form-input" placeholder="예: 인천 소래포구 방파제" id="fLocation">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-lbl">낚시 방법</label>
+        <select class="form-input" id="fMethod">
+          <option value="">선택</option>
+          <option>릴찌낚시</option><option>원투낚시</option><option>루어낚시</option>
+          <option>에기낚시</option><option>찌낚시</option><option>다운샷</option>
+          <option>지깅</option><option>기타</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">날짜</label>
+        <input type="date" class="form-input" id="fDate">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-lbl">미끼 / 루어</label>
+      <input type="text" class="form-input" placeholder="크릴, 미노우 등" id="fBait">
+    </div>
+
+    <div class="form-group">
+      <label class="form-lbl">메모</label>
+      <textarea class="form-input" placeholder="조과 상황, 팁, 특이사항..." id="fMemo"></textarea>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveCatch()">🐟 기록 저장</button>
+    <button class="btn btn-ghost" onclick="closeModal()" style="margin-top:8px;">취소</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ────────── State ────────── */
+const DB_KEY = 'fishing_companion_data';
+let state = loadState();
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { catches: [], points: [], config: {} };
+}
+function persist() { localStorage.setItem(DB_KEY, JSON.stringify(state)); }
+
+/* ────────── Date ────────── */
+const NOW = new Date();
+const DAYS = ['일','월','화','수','목','금','토'];
+document.getElementById('hDate').textContent = `${NOW.getMonth()+1}월 ${NOW.getDate()}일 (${DAYS[NOW.getDay()]})`;
+document.getElementById('hDay').textContent = NOW.getFullYear();
+document.getElementById('fDate').value = NOW.toISOString().split('T')[0];
+
+/* ────────── Navigation ────────── */
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+    btn.classList.add('active');
+    document.getElementById('pg-' + btn.dataset.pg).classList.add('on');
+  });
+});
+
+/* ────────── Modal ────────── */
+const modal = document.getElementById('modal');
+function openModal() { modal.classList.add('open'); document.body.style.overflow = 'hidden'; }
+function closeModal() { modal.classList.remove('open'); document.body.style.overflow = ''; resetForm(); }
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+/* ────────── Species chips ────────── */
+document.querySelectorAll('.sp-chip').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.sp-chip').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+    document.getElementById('fSpecies').value = c.textContent;
+  });
+});
+
+/* ────────── Photo ────────── */
+let photoData = null;
+document.getElementById('photoIn').addEventListener('change', function() {
+  if (this.files && this.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      photoData = e.target.result;
+      const area = document.getElementById('photoArea');
+      document.getElementById('photoIco').style.display = 'none';
+      document.getElementById('photoLbl').style.display = 'none';
+      // Show preview
+      let prev = area.querySelector('.preview');
+      if (!prev) { prev = document.createElement('img'); prev.className = 'preview'; area.appendChild(prev); }
+      prev.src = photoData;
+    };
+    reader.readAsDataURL(this.files[0]);
+  }
+});
+
+/* ────────── Tide bars ────────── */
+function buildTide() {
+  const el = document.getElementById('tideBars');
+  const h = NOW.getHours();
+  let html = '';
+  for (let i = 0; i < 24; i++) {
+    const pct = 25 + 35 * Math.sin((i / 24) * Math.PI * 2 - Math.PI / 3);
+    html += `<div class="tide-bar${i === h ? ' now' : ''}" style="height:${pct}%"></div>`;
+  }
+  el.innerHTML = html;
+}
+buildTide();
+
+/* ────────── Save Catch ────────── */
+const FISH_EMOJI = {
+  '감성돔':'🐟','볼락':'🐡','우럭':'🐟','농어':'🐟','주꾸미':'🦑','광어':'🐟',
+  '참돔':'🎏','벵에돔':'🐟','학꽁치':'🐟','고등어':'🐟'
+};
+
+function saveCatch() {
+  const species = document.getElementById('fSpecies').value.trim();
+  if (!species) { toast('⚠️ 어종을 입력해주세요'); return; }
+
+  const entry = {
+    id: Date.now(),
+    species,
+    size: document.getElementById('fSize').value || '',
+    weight: document.getElementById('fWeight').value || '',
+    location: document.getElementById('fLocation').value.trim(),
+    method: document.getElementById('fMethod').value,
+    date: document.getElementById('fDate').value,
+    bait: document.getElementById('fBait').value.trim(),
+    memo: document.getElementById('fMemo').value.trim(),
+    photo: photoData || null,
+    timestamp: new Date().toISOString()
+  };
+
+  state.catches.unshift(entry);
+
+  // Auto-add point
+  if (entry.location) {
+    const existing = state.points.find(p => p.name === entry.location);
+    if (existing) {
+      existing.count++;
+      existing.lastVisit = entry.date;
+      if (!existing.species.includes(species)) existing.species.push(species);
+    } else {
+      state.points.unshift({ name: entry.location, count: 1, lastVisit: entry.date, species: [species] });
+    }
+  }
+
+  persist();
+  renderCatches();
+  renderPoints();
+  renderStats();
+  closeModal();
+  toast('✅ 조과 기록 저장 완료!');
+}
+
+function resetForm() {
+  ['fSpecies','fSize','fWeight','fLocation','fBait','fMemo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fMethod').value = '';
+  document.getElementById('fDate').value = NOW.toISOString().split('T')[0];
+  document.querySelectorAll('.sp-chip').forEach(c => c.classList.remove('on'));
+  photoData = null;
+  document.getElementById('photoIco').style.display = '';
+  document.getElementById('photoLbl').style.display = '';
+  const prev = document.querySelector('.photo-upload .preview');
+  if (prev) prev.remove();
+}
+
+/* ────────── Render Catches ────────── */
+function renderCatches() {
+  const el = document.getElementById('catchList');
+  if (!state.catches.length) {
+    el.innerHTML = '<div class="empty" id="emptyLog"><div class="ico">🐟</div><p>아직 기록이 없습니다<br>+ 버튼으로 첫 조과를 기록해보세요!</p></div>';
+    return;
+  }
+  el.innerHTML = state.catches.map(c => {
+    const emoji = FISH_EMOJI[c.species] || '🐟';
+    const thumb = c.photo
+      ? `<div class="catch-thumb"><img src="${c.photo}" alt=""></div>`
+      : `<div class="catch-thumb">${emoji}</div>`;
+    const sizeText = [c.size ? c.size + 'cm' : '', c.method].filter(Boolean).join(' · ') || '';
+    return `
+      <div class="catch-item" data-id="${c.id}">
+        ${thumb}
+        <div class="catch-body">
+          <div class="catch-name">${c.species}</div>
+          <div class="catch-meta">
+            ${c.location ? `<span>📍 ${c.location}</span>` : ''}
+            <span>📅 ${c.date ? c.date.replace(/-/g, '.') : '미입력'}</span>
+          </div>
+          ${sizeText ? `<div class="catch-size">${sizeText}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ────────── Render Stats ────────── */
+function renderStats() {
+  const month = NOW.getMonth();
+  const year = NOW.getFullYear();
+  const mc = state.catches.filter(c => {
+    if (!c.date) return false;
+    const d = new Date(c.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+  const dates = [...new Set(mc.map(c => c.date))];
+  const sizes = mc.map(c => parseFloat(c.size)).filter(Boolean);
+  const speciesCount = {};
+  mc.forEach(c => { speciesCount[c.species] = (speciesCount[c.species] || 0) + 1; });
+  const topSpecies = Object.entries(speciesCount).sort((a,b) => b[1]-a[1])[0];
+
+  document.getElementById('sCnt').textContent = dates.length;
+  document.getElementById('sFish').textContent = mc.length;
+  document.getElementById('sMax').textContent = sizes.length ? Math.max(...sizes) + 'cm' : '-';
+  document.getElementById('sTop').textContent = topSpecies ? topSpecies[0] : '-';
+}
+
+/* ────────── Render Points ────────── */
+function renderPoints() {
+  const el = document.getElementById('pointList');
+  if (!state.points.length) {
+    el.innerHTML = '<div class="empty" id="emptyPt"><div class="ico">📍</div><p>저장된 포인트가 없습니다<br>조과 기록 시 장소가 자동 저장됩니다</p></div>';
+    return;
+  }
+  const sorted = [...state.points].sort((a,b) => b.count - a.count);
+  el.innerHTML = sorted.map((p, i) => `
+    <div class="point-item">
+      <div class="pt-rank">${i + 1}</div>
+      <div>
+        <div class="pt-name">${p.name}</div>
+        <div class="pt-sub">방문 ${p.count}회 · 최근 ${p.lastVisit ? p.lastVisit.replace(/-/g,'.') : '-'}</div>
+      </div>
+      <div class="pt-tags">${p.species.slice(0, 2).map(s => `<span class="pt-tag">${s}</span>`).join('')}</div>
+    </div>
+  `).join('');
+}
+
+/* ────────── Config ────────── */
+function saveConfig() {
+  state.config.sheetId = document.getElementById('cfgSheet').value;
+  state.config.scriptUrl = document.getElementById('cfgScript').value;
+  state.config.apiKey = document.getElementById('cfgApiKey').value;
+  persist();
+  toast('✅ 설정 저장 완료!');
+}
+function loadConfig() {
+  if (state.config.sheetId) document.getElementById('cfgSheet').value = state.config.sheetId;
+  if (state.config.scriptUrl) document.getElementById('cfgScript').value = state.config.scriptUrl;
+  if (state.config.apiKey) document.getElementById('cfgApiKey').value = state.config.apiKey;
+}
+
+/* ────────── Export / Import ────────── */
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `fishing_backup_${NOW.toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('📥 백업 파일 다운로드 완료');
+}
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.catches) {
+        state = data;
+        persist();
+        renderCatches(); renderPoints(); renderStats(); loadConfig();
+        toast('📤 데이터 복원 완료!');
+      } else {
+        toast('⚠️ 잘못된 파일 형식');
+      }
+    } catch { toast('⚠️ 파일 읽기 실패'); }
+  };
+  reader.readAsText(file);
+}
+
+/* ────────── Toast ────────── */
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+/* ────────── PWA Install ────────── */
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
+});
+document.getElementById('installBtn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const result = await deferredPrompt.userChoice;
+  if (result.outcome === 'accepted') toast('✅ 앱 설치 완료!');
+  deferredPrompt = null;
+  document.getElementById('installBanner').classList.remove('show');
+});
+document.getElementById('installClose').addEventListener('click', () => {
+  document.getElementById('installBanner').classList.remove('show');
+});
+
+// iOS install hint
+if (/iPhone|iPad/.test(navigator.userAgent) && !navigator.standalone) {
+  const banner = document.getElementById('installBanner');
+  banner.querySelector('.install-banner-text').innerHTML =
+    '📲 홈 화면에 추가하기<span>Safari 공유 버튼 → "홈 화면에 추가" 선택</span>';
+  banner.querySelector('.install-btn').style.display = 'none';
+  banner.classList.add('show');
+}
+
+/* ────────── Service Worker ────────── */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    console.log('SW registered:', reg.scope);
+  }).catch(err => console.log('SW failed:', err));
+}
+
+/* ────────── Init ────────── */
+renderCatches();
+renderPoints();
+renderStats();
+loadConfig();
+</script>
+</body>
+</html>

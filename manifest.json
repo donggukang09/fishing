@@ -1,0 +1,28 @@
+{
+  "name": "바다낚시 컴패니언",
+  "short_name": "낚시컴패니언",
+  "description": "바다낚시 조과 기록, 날씨/파도 정보, 낚시 포인트 관리",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a1628",
+  "theme_color": "#0a1628",
+  "orientation": "portrait",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["lifestyle", "weather"],
+  "lang": "ko",
+  "dir": "ltr"
+}
