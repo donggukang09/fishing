@@ -3044,7 +3044,7 @@ function measDraw(){
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(pt.x * k, pt.y * k, 9 * MS.dpr, 0, 7); ctx.fill();
     ctx.fillStyle = c; ctx.beginPath(); ctx.arc(pt.x * k, pt.y * k, 6 * MS.dpr, 0, 7); ctx.fill(); });
   const steps = ['① 기준 자의 한쪽 끝을 눌러줘 (고리 말고 판 끝)', '② 기준 물체의 반대쪽 끝!', '③ 배스 입 끝을 눌러줘', '④ 꼬리 끝까지! (꼬리 접어서 가장 긴 곳)', '점을 끌어서 미세 조정할 수 있어'];
-  $('#mStep').textContent = MS.busy ? '🤖 덴데가 사진 보면서 재는 중…' : MS.msg && p.length === 4 ? MS.msg : steps[Math.min(p.length, 4)];
+  $('#mStep').textContent = MS.busy ? '🤖 덴데가 사진 보면서 재는 중…' : MS.msg && p.length === 4 ? MS.msg : MS.err && p.length < 4 ? `${MS.err} → ${steps[p.length]}` : steps[Math.min(p.length, 4)];
   const short = p.length >= 2 && measDist(p[0], p[1]) * MS.scale < 40;
   $('#mOut').innerHTML = L ? `<b>${L}</b> cm` : short ? '<small>기준이 너무 작게 찍혔어 — 더 가까이서 찍어줘</small>' : '— cm';
   $('#mOk').disabled = !L;
@@ -3052,23 +3052,26 @@ function measDraw(){
 async function measAuto(){
   if (!MS || MS.busy) return;
   if (!navigator.onLine) { MS.msg = ''; measDraw(); return say('인터넷이 없어서 자동은 안 돼 — 직접 4번 눌러줘', 'dende'); }
-  MS.busy = true; MS.msg = ''; const btn = $('#mAutoBtn'); if (btn) btn.disabled = true; measDraw();
+  MS.busy = true; MS.msg = ''; MS.err = ''; const btn = $('#mAutoBtn'); if (btn) btn.disabled = true; measDraw();
   const cur = MS;
   try {
     const r = await apiPost({ action:'measure', mime:'image/jpeg', data: cur.src.split(',')[1], ref: cur.ref, refDesc: cur.desc });
     if (MS !== cur) return;
-    if (!r.ok) throw new Error(r.error || '자동 측정 실패');
+    if (!r.ok) {
+      const e = r.error || (r.results && r.results[0] && r.results[0].error) || '자동 측정 실패';
+      throw new Error(/알 수 없는 action/.test(e) ? 'Apps Script가 아직 옛날 버전이야 (새 버전 배포 필요)' : e);
+    }
     const P = r.points || {}, conv = v => Array.isArray(v) && v.length === 2 && v.every(n => isFinite(n)) ? { x: v[0] / 1000 * cur.img.width, y: v[1] / 1000 * cur.img.height } : null;
     const pts = [conv(P.ref_a), conv(P.ref_b), conv(P.nose), conv(P.tail)];
     if (pts.some(x => !x)) {
       cur.pts = pts[0] && pts[1] ? pts.slice(0, 2) : [];
-      cur.msg = ''; say(pts[0] && pts[1] ? '기준은 찾았는데 배스 끝을 못 찾았어 — 입 끝, 꼬리 끝을 눌러줘' : '자동으로는 못 찾았어 — 직접 눌러줘' + (P.note ? ` (${P.note})` : ''), 'dende');
+      cur.msg = ''; cur.err = pts[0] && pts[1] ? '⚠ 배스 끝을 못 찾았어' : '⚠ 자동으로 못 찾았어' + (P.note ? ` (${P.note})` : ''); say(pts[0] && pts[1] ? '기준은 찾았는데 배스 끝을 못 찾았어 — 입 끝, 꼬리 끝을 눌러줘' : '자동으로는 못 찾았어 — 직접 눌러줘' + (P.note ? ` (${P.note})` : ''), 'dende');
     } else {
       cur.pts = pts; const conf = +P.confidence;
       cur.msg = `🤖 자동으로 쟀어${conf ? ` (확신 ${Math.round(conf * 100)}%)` : ''} — 틀린 점은 끌어서 고쳐`;
       say(`${measLen()}cm 나왔어!${P.note ? ' ' + P.note : ''}`, 'dende');
     }
-  } catch (err) { if (MS === cur) say('자동 측정 실패: ' + err.message + ' — 직접 눌러줘', 'dende'); }
+  } catch (err) { if (MS === cur) { cur.err = '⚠ ' + err.message; say('자동 측정 실패: ' + err.message + ' — 직접 눌러줘', 'dende'); } }
   finally { if (MS === cur) { cur.busy = false; const b = $('#mAutoBtn'); if (b) b.disabled = false; measDraw(); } }
 }
 function measPt(e){ const r = e.target.getBoundingClientRect(); return { x: (e.clientX - r.left) / MS.scale, y: (e.clientY - r.top) / MS.scale }; }
