@@ -3059,7 +3059,7 @@ async function measAuto(){
     if (MS !== cur) return;
     if (!r.ok) {
       const e = r.error || (r.results && r.results[0] && r.results[0].error) || '자동 측정 실패';
-      throw new Error(/알 수 없는 action/.test(e) ? 'Apps Script가 아직 옛날 버전이야 (새 버전 배포 필요)' : e);
+      throw new Error(/알 수 없는 action/.test(e) ? 'Apps Script 외부 접속 권한 승인 또는 새 버전 배포가 필요해' : e);
     }
     const P = r.points || {}, conv = v => Array.isArray(v) && v.length === 2 && v.every(n => isFinite(n)) ? { x: v[0] / 1000 * cur.img.width, y: v[1] / 1000 * cur.img.height } : null;
     const pts = [conv(P.ref_a), conv(P.ref_b), conv(P.nose), conv(P.tail)];
